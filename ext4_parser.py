@@ -95,10 +95,10 @@ def dir_entry_parse(f, offset, file_blk_num):
 			elif int(select) >= cnt:
 				print "\n\t[*] check your number!"
 			else:
-				return dir_inode_lst, int(select), dir_type_lst
+				return dir_inode_lst, int(select), dir_type_lst, dir_fname_lst
 
 
-def traverse(f, target_inode_lst, select, target_type_lst):
+def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst):
 	target_blk_group, target_inode_num = get_blk_group_inode_num(target_inode_lst[select])
 	blk_grp_offset = target_blk_group * blk_per_group * blk_size
 	#print target_blk_group, target_inode_num, hex(blk_grp_offset)
@@ -131,12 +131,13 @@ def traverse(f, target_inode_lst, select, target_type_lst):
 		cnt = 0
 		for i in target_blk_num:
 			#print i
-			tmp_inode_lst,t_select, tmp_type_lst = dir_entry_parse(f, target_blk_offset[cnt], i)
-			traverse(f, tmp_inode_lst, t_select, tmp_type_lst)
+			tmp_inode_lst,t_select, tmp_type_lst, tmp_fname_lst = dir_entry_parse(f, target_blk_offset[cnt], i)
+			traverse(f, tmp_inode_lst, t_select, tmp_type_lst, tmp_fname_lst)
 			cnt += 1
 	elif target_type_lst[select] == 1:
-		##### file type 		
-		export = open('export', 'wb')
+		##### file type 	
+		fname = target_fname_lst[select]	
+		export = open(fname, 'wb')
 		for i in range(extent_num):			
 			tmp_blk_num = target_blk_num[i]
 			tmp_blk_offset = target_blk_offset[i]
@@ -205,7 +206,7 @@ if __name__ == "__main__":
 	root_blk_offset = []
 	root_extent, root_blk_num, root_blk_offset = inode_table_parse(f, offset,2)
 
-	root_inode_lst, select, root_type_lst = dir_entry_parse(f, root_blk_offset[0], root_blk_num[0])
-	traverse(f, root_inode_lst, select, root_type_lst)
+	root_inode_lst, select, root_type_lst, root_fname_lst = dir_entry_parse(f, root_blk_offset[0], root_blk_num[0])
+	traverse(f, root_inode_lst, select, root_type_lst, root_fname_lst)
 
 	
