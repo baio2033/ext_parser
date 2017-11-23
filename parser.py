@@ -78,7 +78,7 @@ def dir_entry_parse(f, offset, file_blk_num):
 			file_type_chr = file_type_lst[file_type-1]
 			nb = str(name_len) + "s"
 			tmp_name = unpack_from(nb,dir_entry,offset+8)[0]
-			print "\t-\t",cnt,"\t\t",file_type_chr,"\t\t",hex(tmp_inode),"\t\t",tmp_name
+			print "\t-\t",cnt,"\t\t",file_type_chr,"\t\t",tmp_inode,"\t\t",tmp_name
 			dir_inode_lst.append(tmp_inode)
 			dir_fname_lst.append(tmp_name)
 			dir_type_lst.append(file_type)
@@ -104,27 +104,11 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst):
 	blk_grp_offset = target_blk_group * blk_per_group * blk_size
 	#print target_blk_group, target_inode_num, hex(blk_grp_offset)
 	print "\n\t[+] block group offset : ", hex(blk_grp_offset), "\n\n"
-	if target_blk_group != 0 and target_blk_group % 2 == 0:
-		offset = blk_grp_offset + blk_size * 2	
-	elif target_blk_group == 0:
-		offset = blk_grp_offset + blk_size + gdt_size * target_blk_group
-		f.seek(offset)
-		gdt = f.read(gdt_size)
-		offset = gdt_parse(gdt) * blk_size
-	else:
-		offset = blk_grp_offset
-		f.seek(offset)
-		chk_sb = f.read(blk_size)
-		magic_num = unpack_from('<H', chk_sb, 0x38)[0]
-		if magic_num == 0xef53:
-			offset = blk_grp_offset + blk_size + gdt_size * target_blk_group
-			f.seek(offset)
-			#print hex(f.tell())
-			gdt = f.read(gdt_size)
-			offset = gdt_parse(gdt) * blk_size
-		else:
-			offset = blk_grp_offset + blk_size * 2
 
+	offset = blk_size + gdt_size * target_blk_group
+	f.seek(offset)
+	gdt = f.read(gdt_size)
+	offset = gdt_parse(gdt) * blk_size
 	print "\t[+] offset : ", offset,"\n"
 	extent_num, target_blk_num, target_blk_offset, target_file_size = inode_table_parse(f, offset, target_inode_num)
 
@@ -139,7 +123,7 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst):
 	elif target_type_lst[select] == 1:
 		##### file type 	
 		fname = target_fname_lst[select]	
-		export = open(fname, 'wb')
+		export = open("./export/" + fname, 'wb')
 		for i in range(extent_num):			
 			tmp_blk_num = target_blk_num[i]
 			tmp_blk_offset = target_blk_offset[i]
@@ -168,6 +152,11 @@ if __name__ == "__main__":
 
 	dev = sys.argv[1]
 	print "\n[+] image to parse : ",dev
+
+	dir_path = "./export"
+	if not os.path.isdir(dir_path):
+		os.mkdir(dir_path)
+		print "\n[+] export folder : ", dir_path
 
 	f = open(dev,"rb")
 
