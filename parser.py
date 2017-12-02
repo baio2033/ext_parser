@@ -41,13 +41,15 @@ def inode_table_parse(f, offset,num):
 		print "\t\t[-] depth of tree : ",hex(depth)
 		file_blk_cnt = []
 		file_blk_offset = []
+		extent_offset = 0
 		for i in range(extent_num):
-			file_blk_cnt.append(unpack_from('<H',inode_table,0x38)[0])
-			tmp_high = unpack_from('<H',inode_table,0x3a)[0]
-			tmp_low = unpack_from('<I',inode_table,0x3c)[0]
+			file_blk_cnt.append(unpack_from('<H',inode_table,0x38 + extent_offset)[0])
+			tmp_high = unpack_from('<H',inode_table,0x3a + extent_offset)[0]
+			tmp_low = unpack_from('<I',inode_table,0x3c + extent_offset)[0]
 			tmp_blk_num = tmp_high<<32 | tmp_low
 			tmp_offset = tmp_blk_num * blk_size
 			file_blk_offset.append(tmp_offset)
+			extent_offset += 12
 			print "\t\t[-] block num : ",hex(file_blk_cnt[i])
 			print "\t\t[-] block offset : ",hex(file_blk_offset[i])			
 			
@@ -56,11 +58,10 @@ def inode_table_parse(f, offset,num):
 		print "[+] depth > 0!"
 		sys.exit(1)
 
-def dir_entry_parse(f, offset, file_blk_num):
+def dir_entry_parse(f, offset, file_blk_num, start):
 	f.seek(offset)
 	dir_entry = f.read(blk_size * file_blk_num)
-	print "\n=========================================================="
-	print "\n\t[+] directory entry information\n"
+	
 	file_type_lst = ['file','dir','char dev','blk dev','pipe','socket','sym lnk']
 	dir_inode_lst = []
 	dir_fname_lst = []
@@ -68,7 +69,7 @@ def dir_entry_parse(f, offset, file_blk_num):
 	
 	offset = 0
 	cnt = 0
-	print "\t \t[ NUM ]\t\t[ TYPE ]\t[ INODE ]\t[ NAME ]\t\n"
+	
 	while(1):
 		try:
 			tmp_inode = unpack_from('<I',dir_entry,offset)[0]
@@ -78,29 +79,20 @@ def dir_entry_parse(f, offset, file_blk_num):
 			file_type_chr = file_type_lst[file_type-1]
 			nb = str(name_len) + "s"
 			tmp_name = unpack_from(nb,dir_entry,offset+8)[0]
-			print "\t-\t",cnt,"\t\t",file_type_chr,"\t\t",tmp_inode,"\t\t",tmp_name
+			print "\t-\t",start,"\t\t",file_type_chr,"\t\t",tmp_inode,"\t\t",tmp_name
 			dir_inode_lst.append(tmp_inode)
 			dir_fname_lst.append(tmp_name)
 			dir_type_lst.append(file_type)
 			offset += entry_size
 			cnt += 1
+			start += 1
 
-		except:
-			print "\n=========================================================="
-			select = raw_input("\n\nEnter demical number (-1 to exit) > ")
-			if int(select) == -1:
-				print "\n=========================================================="
-				print "\n\n\tTERMINATE THE PROGRAM!\n"
-				print "\n=========================================================="
-				exit(0)
-			elif int(select) >= cnt:
-				print "\n\t[*] check your number!"
-			else:
-				return dir_inode_lst, int(select), dir_type_lst, dir_fname_lst
+		except:			
+			return dir_inode_lst, dir_type_lst, dir_fname_lst, cnt
 
 
-def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst):
-	target_blk_group, target_inode_num = get_blk_group_inode_num(target_inode_lst[select])
+def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst, extent_idx):
+	target_blk_group, target_inode_num = get_blk_group_inode_num(target_inode_lst[extent_idx][select])
 	blk_grp_offset = target_blk_group * blk_per_group * blk_size
 	#print target_blk_group, target_inode_num, hex(blk_grp_offset)
 	print "\n\t[+] block group offset : ", hex(blk_grp_offset), "\n\n"
@@ -112,17 +104,48 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst):
 	print "\t[+] offset : ", offset,"\n"
 	extent_num, target_blk_num, target_blk_offset, target_file_size = inode_table_parse(f, offset, target_inode_num)
 
-	if target_type_lst[select] == 2:
-		##### directory type				
+	if target_type_lst[extent_idx][select] == 2:
+		##### directory type		
+		print "\n=========================================================="
+		print "\n\t[+] directory entry information\n"
+		print "\t \t[ NUM ]\t\t[ TYPE ]\t[ INODE ]\t[ NAME ]\t\n"		
 		cnt = 0
-		for i in target_blk_num:
-			#print i
-			tmp_inode_lst,t_select, tmp_type_lst, tmp_fname_lst = dir_entry_parse(f, target_blk_offset[cnt], i)
-			traverse(f, tmp_inode_lst, t_select, tmp_type_lst, tmp_fname_lst)
-			cnt += 1
-	elif target_type_lst[select] == 1:
+		dir_inode_lst = []
+		dir_type_lst = []
+		dir_fname_lst = []
+		dir_entry_cnt = []
+		total_entry_cnt = 0
+
+		for n in range(extent_num):
+			tmp_inode_lst, tmp_type_lst, tmp_fname_lst, tmp_entry_cnt = dir_entry_parse(f, target_blk_offset[n], target_blk_num[n], total_entry_cnt)
+			dir_inode_lst.append(tmp_inode_lst)
+			dir_type_lst.append(tmp_type_lst)
+			dir_fname_lst.append(tmp_fname_lst)
+			dir_entry_cnt.append(tmp_entry_cnt)
+			total_entry_cnt += tmp_entry_cnt
+
+		print "\n=========================================================="
+		while(1):
+			t_select = int(raw_input("\n\nEnter demical number (-1 to exit) > "))
+			if t_select == -1:
+				print "\n=========================================================="
+				print "\n\n\tTERMINATE THE PROGRAM!\n"
+				print "\n=========================================================="
+				exit(0)
+			break
+
+		for n in range(len(dir_entry_cnt)-1,-1,-1):
+			if t_select >= n:
+				t_select -= sum(dir_entry_cnt[:n])
+				target_extent_idx = n
+				break
+
+		print "target_extent_idx : ", n, " select : ", t_select
+
+		traverse(f, dir_inode_lst, t_select, dir_type_lst, dir_fname_lst, target_extent_idx)
+	elif target_type_lst[extent_idx][select] == 1:
 		##### file type 	
-		fname = target_fname_lst[select]	
+		fname = target_fname_lst[extent_idx][select]	
 		export = open("./export/" + fname, 'wb')
 		for i in range(extent_num):			
 			tmp_blk_num = target_blk_num[i]
@@ -206,7 +229,28 @@ if __name__ == "__main__":
 	root_blk_offset = []
 	root_extent, root_blk_num, root_blk_offset, root_file_size = inode_table_parse(f, offset,2)
 
-	root_inode_lst, select, root_type_lst, root_fname_lst = dir_entry_parse(f, root_blk_offset[0], root_blk_num[0])
-	traverse(f, root_inode_lst, select, root_type_lst, root_fname_lst)
+	root_inode_lst = []
+	root_type_lst = []
+	root_fname_lst = []
+	root_entry_cnt = []
+
+	print "\n=========================================================="
+	print "\n\t[+] directory entry information\n"
+	print "\t \t[ NUM ]\t\t[ TYPE ]\t[ INODE ]\t[ NAME ]\t\n"	
+	tmp_inode_lst, tmp_type_lst, tmp_fname_lst, tmp_entry_cnt = dir_entry_parse(f, root_blk_offset[0], root_blk_num[0], 0)	
+	root_inode_lst.append(tmp_inode_lst)
+	root_type_lst.append(tmp_type_lst)
+	root_fname_lst.append(tmp_fname_lst)
+	root_entry_cnt.append(tmp_entry_cnt)
+	print "\n=========================================================="
+	while(1):
+		t_select = int(raw_input("\n\nEnter demical number (-1 to exit) > "))
+		if t_select == -1:
+			print "\n=========================================================="
+			print "\n\n\tTERMINATE THE PROGRAM!\n"
+			print "\n=========================================================="
+			exit(0)
+		break
+	traverse(f, root_inode_lst, t_select, root_type_lst, root_fname_lst, 0)
 
 	
