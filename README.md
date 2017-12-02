@@ -1,6 +1,5 @@
-# ext_parser
 
-Ext4 FileSystem Parser Python 2.7
+# Ext4 FileSystem Parser Python 2.7
 
 	Jungwan Choi
 	Korea Univ. CYDF
@@ -8,5 +7,5 @@ Ext4 FileSystem Parser Python 2.7
 
 # Usage
 
-python parser.py <image.dd>
+	python parser.py <image.dd>
 
