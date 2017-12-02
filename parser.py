@@ -138,9 +138,7 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst, ext
 			if t_select >= n:
 				t_select -= sum(dir_entry_cnt[:n])
 				target_extent_idx = n
-				break
-
-		print "target_extent_idx : ", n, " select : ", t_select
+				break		
 
 		traverse(f, dir_inode_lst, t_select, dir_type_lst, dir_fname_lst, target_extent_idx)
 	elif target_type_lst[extent_idx][select] == 1:
@@ -160,6 +158,51 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst, ext
 			
 		export.close()
 		print "\n[+] file export done\n"
+
+		target_blk_group, target_inode_num = get_blk_group_inode_num(target_inode_lst[0][0])
+		blk_grp_offset = target_blk_group * blk_per_group * blk_size		
+		offset = blk_size + gdt_size * target_blk_group
+		f.seek(offset)
+		gdt = f.read(gdt_size)
+		offset = gdt_parse(gdt) * blk_size		
+		extent_num, target_blk_num, target_blk_offset, target_file_size = inode_table_parse(f, offset, target_inode_num)
+
+		print "\n=========================================================="
+		print "\n\t[+] directory entry information\n"
+		print "\t \t[ NUM ]\t\t[ TYPE ]\t[ INODE ]\t[ NAME ]\t\n"		
+		cnt = 0
+		dir_inode_lst = []
+		dir_type_lst = []
+		dir_fname_lst = []
+		dir_entry_cnt = []
+		total_entry_cnt = 0
+
+		for n in range(extent_num):
+			tmp_inode_lst, tmp_type_lst, tmp_fname_lst, tmp_entry_cnt = dir_entry_parse(f, target_blk_offset[n], target_blk_num[n], total_entry_cnt)
+			dir_inode_lst.append(tmp_inode_lst)
+			dir_type_lst.append(tmp_type_lst)
+			dir_fname_lst.append(tmp_fname_lst)
+			dir_entry_cnt.append(tmp_entry_cnt)
+			total_entry_cnt += tmp_entry_cnt
+
+		print "\n=========================================================="
+		while(1):
+			t_select = int(raw_input("\n\nEnter demical number (-1 to exit) > "))
+			if t_select == -1:
+				print "\n=========================================================="
+				print "\n\n\tTERMINATE THE PROGRAM!\n"
+				print "\n=========================================================="
+				exit(0)
+			break
+
+		for n in range(len(dir_entry_cnt)-1,-1,-1):
+			if t_select >= n:
+				t_select -= sum(dir_entry_cnt[:n])
+				target_extent_idx = n
+				break		
+
+		traverse(f, dir_inode_lst, t_select, dir_type_lst, dir_fname_lst, target_extent_idx)
+
 		sys.exit(1)
 		
 
