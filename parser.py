@@ -135,7 +135,7 @@ def traverse(f, target_inode_lst, select, target_type_lst, target_fname_lst, ext
 			break
 
 		for n in range(len(dir_entry_cnt)-1,-1,-1):
-			if t_select >= n:
+			if t_select > sum(dir_entry_cnt[:n]):
 				t_select -= sum(dir_entry_cnt[:n])
 				target_extent_idx = n
 				break		
